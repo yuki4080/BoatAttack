@@ -237,8 +237,8 @@ namespace WaterSystem
         private void UpdateDrag(float submergedAmount)
         {
             PercentSubmerged = math.lerp(PercentSubmerged, submergedAmount, 0.25f);
-            _rb.drag = _baseDrag + _baseDrag * (PercentSubmerged * 10f);
-            _rb.angularDrag = _baseAngularDrag + PercentSubmerged * 0.5f;
+            _rb.linearDamping = _baseDrag + _baseDrag * (PercentSubmerged * 10f);
+            _rb.angularDamping = _baseAngularDrag + PercentSubmerged * 0.5f;
         }
 
         private void GetVelocityPoints()
@@ -248,13 +248,6 @@ namespace WaterSystem
 
         private void SliceIntoVoxels()
         {
-            var t = transform;
-            var rot = t.rotation;
-            var pos = t.position;
-            var size = t.localScale;
-            t.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
-            t.localScale = Vector3.one;
-
             _voxels = null;
             var points = new List<Vector3>();
 
@@ -288,8 +281,6 @@ namespace WaterSystem
             }
 
             _voxels = points.ToArray();
-			t.SetPositionAndRotation(pos, rot);
-            t.localScale = size;
             var voxelVolume = Mathf.Pow(voxelResolution, 3f) * _voxels.Length;
             var rawVolume = rawBounds.size.x * rawBounds.size.y * rawBounds.size.z;
             volume = Mathf.Min(rawVolume, voxelVolume);
@@ -301,7 +292,9 @@ namespace WaterSystem
             var bounds = new Bounds();
             foreach (var nextCollider in colliders)
             {
-                bounds.Encapsulate(nextCollider.bounds);
+                var b = nextCollider.bounds;
+                b.center = Vector3.zero;
+                bounds.Encapsulate(b);
             }
             return bounds;
 		}
@@ -325,8 +318,8 @@ namespace WaterSystem
                 Debug.LogError($"Buoyancy:Object \"{name}\" had no Rigidbody. Rigidbody has been added.");
             }
             _rb.centerOfMass = centerOfMass + _voxelBounds.center;
-            _baseDrag = _rb.drag;
-            _baseAngularDrag = _rb.angularDrag;
+            _baseDrag = _rb.linearDamping;
+            _baseAngularDrag = _rb.angularDamping;
             
             _velocity = new float3[_voxels.Length];
             var archimedesForceMagnitude = WaterDensity * Mathf.Abs(Physics.gravity.y) * volume;

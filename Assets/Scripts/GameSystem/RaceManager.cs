@@ -36,6 +36,20 @@ namespace BoatAttack
         }
 
         [Serializable]
+        public enum RaceStatus
+        {
+            PreRace,
+            Race,
+            PostRace
+        }
+
+        private enum ResetMode
+        {
+            ResetBoatData,
+            KeepBoatData,
+        }
+
+        [Serializable]
         public class Race
         {
             //Race options
@@ -57,6 +71,7 @@ namespace BoatAttack
         public static RaceManager Instance;
         [NonSerialized] public static bool RaceStarted;
         [NonSerialized] public static Race RaceData;
+        [NonSerialized] public static RaceStatus RaceState;
         public Race demoRaceData = new Race();
         [NonSerialized] public static float RaceTime;
         private readonly Dictionary<int, float> _boatTimes = new Dictionary<int, float>();
@@ -77,6 +92,7 @@ namespace BoatAttack
                         var raceUi = RaceData.boats[0].Boat.RaceUi;
                         raceUi.MatchEnd();
                         ReplayCamera.Instance.EnableSpectatorMode();
+                        RaceState = RaceStatus.PostRace;
                     }
                     break;
                 case GameType.LocalMultiplayer:
@@ -99,10 +115,12 @@ namespace BoatAttack
             Instance = this;
         }
 
-        private void Reset()
+        private void Reset(ResetMode mode = ResetMode.ResetBoatData)
         {
             RaceStarted = false;
-            RaceData.boats.Clear();
+            RaceState = RaceStatus.PreRace;
+            if (mode == ResetMode.ResetBoatData)
+                RaceData.boats.Clear();
             RaceTime = 0f;
             _boatTimes.Clear();
             raceStarted = null;
@@ -192,6 +210,7 @@ namespace BoatAttack
         /// <returns></returns>
         private static IEnumerator BeginRace()
         {
+            RaceState = RaceStatus.PreRace;
             var introCams = GameObject.FindWithTag("introCameras");
             introCams.TryGetComponent<PlayableDirector>(out var introDirector);
 
@@ -208,6 +227,7 @@ namespace BoatAttack
             
             RaceStarted = true;
             raceStarted?.Invoke(RaceStarted);
+            RaceState = RaceStatus.Race;
             
             SceneManager.sceneLoaded -= Setup;
         }
@@ -242,7 +262,7 @@ namespace BoatAttack
             if (!RaceStarted) return;
 
             int finished = RaceData.boatCount;
-            for (var i = 0; i < RaceData.boats.Count; i++)
+            for (var i = 0; i < RaceData.boatCount; i++)
             {
                 var boat = RaceData.boats[i].Boat;
                 if (boat.MatchComplete)
@@ -277,30 +297,42 @@ namespace BoatAttack
             SceneManager.sceneLoaded += Setup;
         }
 
-        public static void UnloadRace()
+        private static void UnloadRaceInternal(ResetMode mode = ResetMode.ResetBoatData)
         {
-            Debug.LogWarning("Unloading Race");
+            ReplayCamera.Instance.DisableSpectatorMode();
+            Debug.Log("Unloading Race");
             if(Instance.raceUiPrefab != null && Instance.raceUiPrefab.IsValid())
             {
                 Instance.raceUiPrefab.ReleaseAsset();
             }
+            Instance.Reset(mode);
+        }
 
-            Instance.Reset();
-            AppSettings.LoadScene(0, LoadSceneMode.Single);
+        public static void UnloadRace()
+        {
+            UnloadRaceInternal();
+            AppSettings.LoadScene(0);
+        }
+        
+        public static void RestartRace()
+        {
+            UnloadRaceInternal(ResetMode.KeepBoatData); // Do not clear when we restart race as data is populated by Main Menu
+            LoadGame();
         }
         
         public static void SetHull(int player, int hull) => RaceData.boats[player].boatPrefab = Instance.boats[hull];
         
         private static IEnumerator CreateBoats()
         {
-            for (int i = 0; i < RaceData.boats.Count; i++)
+            for (int i = 0; i < RaceData.boatCount; i++)
             {
                 var boat = RaceData.boats[i]; // boat to setup
 
                 // Load prefab
-                var startingPosition = WaypointGroup.Instance.StartingPositions[i];
-                AsyncOperationHandle<GameObject> boatLoading = Addressables.InstantiateAsync(boat.boatPrefab, startingPosition.GetColumn(3),
-                    Quaternion.LookRotation(startingPosition.GetColumn(2)));
+                var startingTransform = WaypointGroup.Instance.StartingPositions[i];
+                var startingPosition = startingTransform.GetPosition();
+                var startingRotation = Quaternion.LookRotation(startingTransform.GetColumn(2));
+                AsyncOperationHandle<GameObject> boatLoading = Addressables.InstantiateAsync(boat.boatPrefab, startingPosition, startingRotation);
 
                 yield return boatLoading; // wait for boat asset to load
 

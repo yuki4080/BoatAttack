@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections;
-using GameplayIngredients;
+using LegacyUtility;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Rendering.Universal;
@@ -259,9 +259,9 @@ namespace BoatAttack
             yield return assetLoading;
         }
 
-        public static void ExitGame(string s = "null")
+        public static void ExitGame(string s = "")
         {
-            if(s != "null")
+            if(s != "")
                 Debug.LogError(s);
 #if UNITY_EDITOR
             UnityEditor.EditorApplication.ExitPlaymode();

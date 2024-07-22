@@ -66,7 +66,7 @@ half3 Absorption(half depth)
 
 float2 AdjustedDepth(half2 uvs, half4 additionalData)
 {
-	float rawD = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_CameraDepthTexture, uvs);
+	float rawD = SAMPLE_DEPTH_TEXTURE(_CameraDepthTexture, sampler_ScreenTextures_linear_clamp, uvs);
 	float d = LinearEyeDepth(rawD, _ZBufferParams);
 
 	// TODO: Changing the usage of UNITY_REVERSED_Z this way to fix testing, but I'm not sure the original code is correct anyway.
@@ -252,7 +252,7 @@ half4 WaterFragment(WaterVertexOutput IN) : SV_Target
     BRDFData brdfData;
     half alpha = 1;
     InitializeBRDFData(half3(0, 0, 0), 0, half3(1, 1, 1), 0.95, alpha, brdfData);
-	half3 spec = DirectBDRF(brdfData, IN.normal, mainLight.direction, IN.viewDir, false) * shadow * mainLight.color;
+	half3 spec = DirectBDRF(brdfData, IN.normal, mainLight.direction, IN.viewDir, true) * shadow * mainLight.color;
 #ifdef _ADDITIONAL_LIGHTS
     uint pixelLightCount = GetAdditionalLightsCount();
     for (uint lightIndex = 0u; lightIndex < pixelLightCount; ++lightIndex)
